@@ -68,9 +68,11 @@ A implementação  envolveu realizar um fine-tuning na última camada do modelo 
 
 # Citation
 
+```
 @inproceedings{xie2021segformer,
   title={SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers},
   author={Xie, Enze and Wang, Wenhai and Yu, Zhiding and Anandkumar, Anima and Alvarez, Jose M and Luo, Ping},
   booktitle={Neural Information Processing Systems (NeurIPS)},
   year={2021}
 }
+```
