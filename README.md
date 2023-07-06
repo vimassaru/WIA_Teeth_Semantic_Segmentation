@@ -7,7 +7,7 @@ Este projeto foi desenvolvido na unidade curricular Inteligência Artificial da 
 
 O projeto **SmileDataAI**, é um modelo de aprendizado de máquina para tarefa de segmentação semântica em imagens panorâmicas de raio-x odontológicos. O modelo recebe uma *imagem* como input e retorna em seu output uma predição em formato de *máscara*. Segue abaixo uma predição realizada pelo modelo:
 
-![Predição do Modelo vs Ground Truth](WIA/data/images/pred_ground_truth.png)
+<img align="center" src="WIA/data/images/pred_ground_truth.png">
 
 # Tecnologias Utilizadas
 
@@ -17,18 +17,21 @@ Para o desenvolvimento de todo o projeto, foram utilizadas as seguintes tecnolog
   <img align="center" alt="Icon-Jupyter" height="30" width="40" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/jupyter/jupyter-original.svg" />
   <img align="center" alt="Icon-PyTorch" height="30" width="40" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/pytorch/pytorch-original.svg"/>
 </div>
+
+
 # Pipeline do Projeto
 
 Abaixo está demonstrado o pipeline utilizado para o desenvolvimento da rede neural, destacando as etapas de treino e teste em <span style="color:yellow">amarelo</span> e <span style="color:yellow">amarelo</span>, respectivamente.
 
-![Pipeline do Modelo](WIA/data/images/SmileDataAI.png)
+<img align="center" src="WIA/data/images/SmileDataAI.png">
 
 ## Hugging Face - Modelo e Dataset
 
 O meu modelo e o dataset tratado se encontram na página do Hugging Face nos seguintes links:
 
-- [Dataset](https://huggingface.co/datasets/vimassaru/teethsegmentation/tree/main)
-- [Pre-trained-model](https://huggingface.co/vimassaru/segformer-b0-finetuned-segments-sidewalk-oct-22)
+- <a href="https://huggingface.co/datasets/vimassaru/teethsegmentation/tree/main">
+- <a href="https://huggingface.co/vimassaru/segformer-b0-finetuned-segments-sidewalk-oct-22">
+
 
 ## Configurações do Modelo
 
@@ -55,10 +58,10 @@ Foram utilizadas os seguintes argumentos para os parâmetros de treino:
 
 A estrutura de rede neural artificial pré treinada utilizada foi o SegFormer **nvidia/mit-b0**. Desenvolvido conforme a imagem abaixo:
 
-![Arquitetura SegFormer](WIA/data/images/segformer_architecture.png)
+<img align="center" src="WIA/data/images/segformer_architecture.png">
 
 A implementação  envolveu realizar um fine-tuning na última camada do modelo para que ele se adequasse a quantidade de classes das imagens de raio-x.
 
 É possível ver as modificações desenvolvida dentro do jupyter notebook na pasta `src`.
 
-![Jupyter Notebook](WIA/src/smiledataai_segformer_pretrained.ipynb)
+<a href="WIA/src/smiledataai_segformer_pretrained.ipynb">Google Colab Notebook</a>
