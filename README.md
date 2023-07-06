@@ -64,7 +64,7 @@ A implementação  envolveu realizar um fine-tuning na última camada do modelo 
 
 É possível ver as modificações desenvolvida dentro do jupyter notebook na pasta `src`.
 
-<a href="WIA/src/smiledataai_segformer_pretrained.ipynb">Google Colab Notebook</a>
+<a href="src/smiledataai_segformer_pretrained.ipynb">Google Colab Notebook</a>
 
 # Citation
 
