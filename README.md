@@ -9,7 +9,7 @@ O projeto **SmileDataAI**, é um modelo de aprendizado de máquina para tarefa d
 
 <img align="center" src="https://github.com/vimassaru/WIA/blob/main/data/images/pred_ground_truth.png">
 
-*Artigo do projeto*: [SmileDataAI_segmentacao_semantica_de_dentes_em_imagens_por_meio_de_aprendizado_profundo](SmileDataAI_segmentacao_semantica_de_dentes_em_imagens_por_meio_de_aprendizado_profundo.pdf)
+*Artigo do projeto*: [SmileDataAI: segmentação semântica de dentes em imagens de raio-x por meio de aprendizado profundo.](SmileDataAI_segmentacao_semantica_de_dentes_em_imagens_por_meio_de_aprendizado_profundo.pdf)
 
 # Tecnologias Utilizadas
 
