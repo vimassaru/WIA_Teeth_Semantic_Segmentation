@@ -29,8 +29,8 @@ Abaixo está demonstrado o pipeline utilizado para o desenvolvimento da rede neu
 
 O meu modelo e o dataset tratado se encontram na página do Hugging Face nos seguintes links:
 
-- ![Dataset](https://huggingface.co/datasets/vimassaru/teethsegmentation/tree/main)
-- ![Modelo](https://huggingface.co/vimassaru/segformer-b0-finetuned-segments-sidewalk-oct-22)
+- [Dataset](https://huggingface.co/datasets/vimassaru/teethsegmentation/tree/main)
+- [Modelo](https://huggingface.co/vimassaru/segformer-b0-finetuned-segments-sidewalk-oct-22)
 
 
 ## Configurações do Modelo
