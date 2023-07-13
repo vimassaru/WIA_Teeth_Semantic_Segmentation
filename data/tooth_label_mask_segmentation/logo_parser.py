@@ -1,5 +1,6 @@
 import csv
 import numpy as np
+import os
 from PIL import Image
 from pathlib import Path
 
@@ -143,4 +144,38 @@ image1_path = Path('train/image/100_png23a801b2d65aa55e991be54db935ebe2.jpg')
 image2_path = Path('output/heat_map.png')
 
 # Chama a função para combinar as imagens
-combine_images(image1_path, image2_path)
+# combine_images(image1_path, image2_path)
+
+# ---------------------------------------------------------------------- #
+
+
+def colorize_images_folder(input_folder, output_folder, color_mapping):
+    # Verifica se a pasta de saída existe e a cria, se necessário
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Percorre todas as imagens na pasta de entrada
+    for image_file in os.listdir(input_folder):
+        if image_file.endswith(".png") or image_file.endswith(".jpg"):
+            # Caminho completo para a imagem de entrada
+            input_image_path = os.path.join(input_folder, image_file)
+
+            # Cria o nome de saída para a imagem colorizada
+            output_image_file = os.path.splitext(
+                image_file)[0] + "_colorized.png"
+            output_image_path = os.path.join(output_folder, output_image_file)
+
+            # Chama a função colorize_classes para colorizar a imagem e salvá-la
+            colorize_classes(input_image_path,
+                             output_image_path, color_mapping)
+
+            print(f"Imagem colorizada salva em '{output_image_path}'.")
+
+
+# Caminho da pasta de entrada contendo as imagens em escala de cinza
+input_folder = Path('train/mask')
+
+# Caminho da pasta de saída para as imagens colorizadas
+output_folder = Path('output/colorized')
+
+# Chama a função para colorizar todas as imagens na pasta
+colorize_images_folder(input_folder, output_folder, color_mapping)
