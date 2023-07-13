@@ -15,9 +15,9 @@ O projeto **SmileDataAI**, é um modelo de aprendizado de máquina para tarefa d
 
 Para o desenvolvimento de todo o projeto, foram utilizadas as seguintes tecnologias:
 <div style="display: inline_block">
-  <img align="center" alt="Icon-Python" height="30" width="40" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg">
-  <img align="center" alt="Icon-Jupyter" height="30" width="40" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/jupyter/jupyter-original.svg" />
-  <img align="center" alt="Icon-PyTorch" height="30" width="40" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/pytorch/pytorch-original.svg"/>
+  <img align="center" alt="Icon-Python" height="100" width="200" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg">
+  <img align="center" alt="Icon-Jupyter" height="100" width="200" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/jupyter/jupyter-original.svg" />
+  <img align="center" alt="Icon-PyTorch" height="100" width="200" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/pytorch/pytorch-original.svg"/>
 </div>
 
 
@@ -32,7 +32,8 @@ Abaixo está demonstrado o pipeline utilizado para o desenvolvimento da rede neu
 O meu modelo e o dataset tratado se encontram na página do Hugging Face nos seguintes links:
 
 - [Dataset](https://huggingface.co/datasets/vimassaru/teethsegmentation/tree/main)
-- [Modelo](https://huggingface.co/vimassaru/segformer-b0-finetuned-segments-sidewalk-oct-22)
+- [Arquitetura SegFormer](https://huggingface.co/vimassaru/segformer-b0-finetuned-segments-sidewalk-oct-22)
+- [Arquitetura UPerNet Convnext Tiny](https://huggingface.co/vimassaru/teeth-seg-upernet-convnext-tiny)
 
 
 ## Configurações do Modelo
@@ -62,7 +63,7 @@ A estrutura de rede neural artificial pré treinada utilizada foi o SegFormer **
 
 <img align="center" src="https://github.com/vimassaru/WIA/blob/main/data/images/segformer_architecture.png">
 
-A implementação  envolveu realizar um fine-tuning na última camada do modelo para que ele se adequasse a quantidade de classes das imagens de raio-x.
+A implementação envolveu realizar um fine-tuning na última camada do modelo para que ele se adequasse a quantidade de classes das imagens de raio-x.
 
 É possível ver as modificações desenvolvida dentro do jupyter notebook na pasta `src`.
 
