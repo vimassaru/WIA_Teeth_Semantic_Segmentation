@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+
+# SavedModel intermediario (data/tensorflow_checkpoint/*.keras e o modelo
+# convertido em web/model/ ja cobrem o que importa versionar).
+data/tensorflow_savedmodel/

@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SmileDataAI — segmentação de dentes</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2f3a;
+    --text: #e8eaed;
+    --text-secondary: #c3c2b7;
+    --muted: #9aa2af;
+    --accent: #4f8cff;
+    --gridline: #2c2c2a;
+    /* Paleta categórica (slots 1 e 2, passo escuro) — ver skill dataviz. */
+    --series-augmented: #3987e5;
+    --series-baseline: #d95926;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px 16px 60px;
+  }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  p.subtitle { color: var(--muted); margin-top: 0; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  #dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 32px;
+    text-align: center;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  #dropzone.dragover { border-color: var(--accent); color: var(--text); }
+  #fileInput { display: none; }
+  #status { margin-top: 12px; color: var(--muted); font-size: 0.9rem; min-height: 1.2em; }
+  .canvas-wrap { position: relative; max-width: 100%; margin-top: 16px; display: none; }
+  .canvas-wrap canvas { max-width: 100%; height: auto; display: block; border-radius: 8px; }
+  #overlayCanvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+  .controls { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .controls label { font-size: 0.9rem; color: var(--muted); }
+  #legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 6px;
+    margin-top: 14px;
+    font-size: 0.8rem;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  footer { color: var(--muted); font-size: 0.8rem; text-align: center; margin-top: 30px; }
+  a { color: var(--accent); }
+
+  /* --- Métricas --- */
+  .stat-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-tile {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-tile .label { color: var(--muted); font-size: 0.8rem; }
+  .stat-tile .value { font-size: 1.6rem; font-weight: 600; margin-top: 2px; }
+  .chart-block { margin-bottom: 28px; }
+  .chart-block:last-child { margin-bottom: 0; }
+  .chart-title { font-size: 0.9rem; color: var(--text); margin-bottom: 4px; }
+  .chart-legend { display: flex; gap: 16px; margin-bottom: 8px; font-size: 0.8rem; color: var(--text-secondary); }
+  .chart-legend-item { display: flex; align-items: center; gap: 6px; }
+  .chart-legend-key { width: 14px; height: 2px; border-radius: 1px; flex-shrink: 0; }
+  .chart-svg-wrap { position: relative; }
+  .chart-svg-wrap svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .chart-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    white-space: nowrap;
+    transform: translate(-50%, -110%);
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 5;
+  }
+  .chart-tooltip.visible { opacity: 1; }
+  .chart-tooltip .tt-epoch { color: var(--muted); margin-bottom: 2px; }
+  .chart-tooltip .tt-row { display: flex; align-items: center; gap: 6px; }
+  .chart-tooltip .tt-key { width: 10px; height: 2px; flex-shrink: 0; }
+  .chart-tooltip .tt-value { font-weight: 600; margin-left: auto; padding-left: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SmileDataAI</h1>
+  <p class="subtitle">
+    Segmentação semântica de dentes em raio-x panorâmico — inferência rodando
+    inteiramente no seu navegador via TensorFlow.js, reimplementação em
+    TensorFlow do <a href="../SmileDataAI_segmentacao_semantica_de_dentes_em_imagens_por_meio_de_aprendizado_profundo.pdf">artigo original</a>.
+  </p>
+
+  <div class="panel">
+    <div id="dropzone">
+      Arraste uma imagem de raio-x panorâmico aqui, ou clique para escolher um arquivo.
+      <input id="fileInput" type="file" accept="image/*" />
+    </div>
+    <div id="status"></div>
+
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="imageCanvas"></canvas>
+      <canvas id="overlayCanvas"></canvas>
+    </div>
+
+    <div class="controls" id="opacityControl" style="display:none">
+      <label for="opacity">Opacidade da máscara</label>
+      <input id="opacity" type="range" min="0" max="1" step="0.05" value="0.6" />
+    </div>
+  </div>
+
+  <div class="panel">
+    <strong>Legenda (notação dentária)</strong>
+    <div id="legend"></div>
+  </div>
+
+  <div class="panel">
+    <strong>Métricas de segmentação semântica</strong>
+    <p class="subtitle" style="margin-top: 4px;">
+      No conjunto de teste (33 imagens), mesmas métricas usadas no artigo original —
+      comparando o treino com e sem augmentação de dados (flip horizontal com
+      remapeamento de quadrante + variação de brilho/contraste).
+    </p>
+    <div class="stat-tiles" id="statTiles"></div>
+    <div class="chart-block">
+      <div class="chart-title">Loss de teste por época</div>
+      <div class="chart-legend" id="lossChartLegend"></div>
+      <div class="chart-svg-wrap" id="lossChartWrap"></div>
+    </div>
+    <div class="chart-block">
+      <div class="chart-title">IoU médio por época</div>
+      <div class="chart-legend" id="iouChartLegend"></div>
+      <div class="chart-svg-wrap" id="iouChartWrap"></div>
+    </div>
+  </div>
+
+  <footer>Modelo: SegFormer (nvidia/mit-b0) fine-tuned em TensorFlow · roda 100% local, nenhuma imagem sai do seu navegador.</footer>
+</main>
+
+<script src="metrics_data.js"></script>
+<script>
+const MODEL_URL = "model/model.json";
+const NUM_CLASSES = 33; // 0 = background + 32 dentes
+
+// Nome anatômico por posição (1-8) dentro do quadrante, igual à Tabela I do artigo.
+const POSITION_NAMES = [
+  "Incisivo central", "Incisivo lateral", "Canino",
+  "1º pré-molar", "2º pré-molar", "1º molar", "2º molar", "3º molar",
+];
+const QUADRANT_NAMES = {
+  1: "superior direito", 2: "superior esquerdo",
+  3: "inferior esquerdo", 4: "inferior direito",
+};
+
+function labelForClass(classId) {
+  if (classId === 0) return "Fundo";
+  const quadrant = Math.floor((classId - 1) / 8) + 1;
+  const position = ((classId - 1) % 8) + 1;
+  return `Dente ${quadrant}${position} — ${POSITION_NAMES[position - 1]} ${QUADRANT_NAMES[quadrant]}`;
+}
+
+// Paleta determinística via HSL, uma cor por classe (fundo fica transparente/cinza).
+function colorForClass(classId) {
+  if (classId === 0) return [0, 0, 0, 0];
+  const hue = ((classId - 1) * 360) / (NUM_CLASSES - 1);
+  const [r, g, b] = hslToRgb(hue / 360, 0.65, 0.55);
+  return [r, g, b, 255];
+}
+
+function hslToRgb(h, s, l) {
+  const k = (n) => (n + h * 12) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+}
+
+function buildLegend() {
+  const legend = document.getElementById("legend");
+  for (let c = 1; c < NUM_CLASSES; c++) {
+    const [r, g, b] = colorForClass(c);
+    const item = document.createElement("div");
+    item.className = "legend-item";
+    item.innerHTML = `<span class="swatch" style="background: rgb(${r},${g},${b})"></span>${labelForClass(c)}`;
+    legend.appendChild(item);
+  }
+}
+buildLegend();
+
+const statusEl = document.getElementById("status");
+let model = null;
+
+async function loadModel() {
+  statusEl.textContent = "Carregando modelo…";
+  model = await tf.loadGraphModel(MODEL_URL);
+  statusEl.textContent = "Modelo carregado. Envie uma imagem de raio-x.";
+}
+loadModel().catch((err) => {
+  statusEl.textContent =
+    "Não consegui carregar o modelo em " + MODEL_URL +
+    " — confirme que os arquivos convertidos (tensorflowjs_converter) estão em web/model/ " +
+    "e que a página está sendo servida por um servidor local (não aberta como file://).";
+  console.error(err);
+});
+
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const canvasWrap = document.getElementById("canvasWrap");
+const imageCanvas = document.getElementById("imageCanvas");
+const overlayCanvas = document.getElementById("overlayCanvas");
+const opacityControl = document.getElementById("opacityControl");
+const opacitySlider = document.getElementById("opacity");
+
+let lastMaskImageData = null;
+
+dropzone.addEventListener("click", () => fileInput.click());
+dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+dropzone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropzone.classList.remove("dragover");
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener("change", () => {
+  if (fileInput.files.length) handleFile(fileInput.files[0]);
+});
+opacitySlider.addEventListener("input", drawOverlay);
+
+async function handleFile(file) {
+  if (!model) {
+    statusEl.textContent = "Modelo ainda não carregou, aguarde e tente de novo.";
+    return;
+  }
+  const img = await loadImageBitmap(file);
+
+  imageCanvas.width = overlayCanvas.width = img.width;
+  imageCanvas.height = overlayCanvas.height = img.height;
+  canvasWrap.style.display = "block";
+  opacityControl.style.display = "flex";
+
+  const ctx = imageCanvas.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+
+  statusEl.textContent = "Rodando inferência…";
+  const t0 = performance.now();
+  const maskArray = await runInference(imageCanvas);
+  const elapsed = (performance.now() - t0).toFixed(0);
+  statusEl.textContent = `Inferência concluída em ${elapsed}ms.`;
+
+  lastMaskImageData = maskToImageData(maskArray, img.width, img.height);
+  drawOverlay();
+}
+
+function loadImageBitmap(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function runInference(canvas) {
+  // O SavedModel já inclui resize/normalização/upsample no grafo (ver
+  // src/tensorflow/export_savedmodel.py) — aqui só convertemos a imagem
+  // para um tensor uint8 NHWC, exatamente o que a input_signature espera.
+  return tf.tidy(() => {
+    const input = tf.browser.fromPixels(canvas).expandDims(0); // (1, H, W, 3) uint8
+    const output = model.execute(input); // (1, H, W) int32
+    return output.squeeze([0]).arraySync();
+  });
+}
+
+function maskToImageData(maskArray, width, height) {
+  const imageData = new ImageData(width, height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const classId = maskArray[y][x];
+      const [r, g, b, a] = colorForClass(classId);
+      const idx = (y * width + x) * 4;
+      imageData.data[idx] = r;
+      imageData.data[idx + 1] = g;
+      imageData.data[idx + 2] = b;
+      imageData.data[idx + 3] = a;
+    }
+  }
+  return imageData;
+}
+
+function drawOverlay() {
+  if (!lastMaskImageData) return;
+  const ctx = overlayCanvas.getContext("2d");
+  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  ctx.putImageData(lastMaskImageData, 0, 0);
+  overlayCanvas.style.opacity = opacitySlider.value;
+}
+
+// --- Métricas ---
+
+const RUN_LABELS = { com_augmentacao: "Com augmentação (atual)", sem_augmentacao: "Sem augmentação" };
+const RUN_COLORS = { com_augmentacao: "var(--series-augmented)", sem_augmentacao: "var(--series-baseline)" };
+const RUN_COLORS_RESOLVED = { com_augmentacao: "#3987e5", sem_augmentacao: "#d95926" };
+
+function renderStatTiles() {
+  if (!window.METRICS_DATA) return;
+  const { pixel_accuracy, mean_iou, mean_dice } = window.METRICS_DATA.final;
+  const tiles = [
+    { label: "Pixel accuracy (teste)", value: (pixel_accuracy * 100).toFixed(1) + "%" },
+    { label: "IoU médio (teste)", value: mean_iou.toFixed(3) },
+    { label: "Dice / F1 médio (teste)", value: mean_dice.toFixed(3) },
+  ];
+  const container = document.getElementById("statTiles");
+  for (const tile of tiles) {
+    const el = document.createElement("div");
+    el.className = "stat-tile";
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = tile.label;
+    const value = document.createElement("div");
+    value.className = "value";
+    value.textContent = tile.value;
+    el.appendChild(label);
+    el.appendChild(value);
+    container.appendChild(el);
+  }
+}
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, v);
+  return el;
+}
+
+// Gráfico de linha simples (2 séries) com grid, legenda, crosshair + tooltip
+// no hover — spec da skill dataviz: linhas 2px, marcador de 8px com anel de
+// 2px na cor da superfície, eixo/grid em hairline recessivo, sem eixo duplo.
+function renderLineChart({ wrapId, legendId, runKeys, field, yDomain, yTicks, yFormat }) {
+  const runs = window.METRICS_DATA.runs;
+  const W = 640, H = 240;
+  const marginLeft = 42, marginRight = 12, marginTop = 10, marginBottom = 24;
+  const plotW = W - marginLeft - marginRight;
+  const plotH = H - marginTop - marginBottom;
+
+  const xMax = Math.max(...runKeys.map((k) => runs[k].epoch.length ? runs[k].epoch[runs[k].epoch.length - 1] : 1));
+  const [yMin, yMax] = yDomain;
+
+  const xScale = (epoch) => marginLeft + ((epoch - 1) / (xMax - 1)) * plotW;
+  const yScale = (v) => marginTop + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img" });
+
+  // Gridlines horizontais + labels do eixo Y.
+  for (const tick of yTicks) {
+    const y = yScale(tick);
+    svg.appendChild(svgEl("line", {
+      x1: marginLeft, x2: W - marginRight, y1: y, y2: y,
+      stroke: "var(--gridline)", "stroke-width": 1,
+    }));
+    const label = svgEl("text", {
+      x: marginLeft - 8, y: y + 3, "text-anchor": "end",
+      fill: "var(--muted)", "font-size": 10,
+    });
+    label.textContent = yFormat(tick);
+    svg.appendChild(label);
+  }
+
+  // Ticks do eixo X (época).
+  const xTicks = [1, ...([Math.round(xMax * 0.25), Math.round(xMax * 0.5), Math.round(xMax * 0.75)]), xMax];
+  for (const tick of xTicks) {
+    const x = xScale(tick);
+    const label = svgEl("text", {
+      x, y: H - marginBottom + 14, "text-anchor": "middle",
+      fill: "var(--muted)", "font-size": 10,
+    });
+    label.textContent = tick;
+    svg.appendChild(label);
+  }
+
+  const seriesData = [];
+  for (const key of runKeys) {
+    const run = runs[key];
+    if (!run || !run.epoch.length) continue;
+    const color = RUN_COLORS_RESOLVED[key];
+    const points = run.epoch.map((e, i) => [xScale(e), yScale(run[field][i])]);
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ");
+    svg.appendChild(svgEl("path", {
+      d, fill: "none", stroke: color, "stroke-width": 2,
+      "stroke-linejoin": "round", "stroke-linecap": "round",
+    }));
+    const last = points[points.length - 1];
+    svg.appendChild(svgEl("circle", {
+      cx: last[0], cy: last[1], r: 4, fill: color,
+      stroke: "var(--panel)", "stroke-width": 2,
+    }));
+    seriesData.push({ key, color, run, points });
+  }
+
+  // Crosshair (linha vertical que acompanha o ponteiro, encaixando na
+  // época mais próxima) + hit area invisível cobrindo a área do gráfico.
+  const crosshair = svgEl("line", {
+    x1: 0, x2: 0, y1: marginTop, y2: H - marginBottom,
+    stroke: "var(--muted)", "stroke-width": 1, opacity: 0,
+  });
+  svg.appendChild(crosshair);
+  const hitArea = svgEl("rect", {
+    x: marginLeft, y: marginTop, width: plotW, height: plotH,
+    fill: "transparent",
+  });
+  svg.appendChild(hitArea);
+
+  const wrap = document.getElementById(wrapId);
+  wrap.innerHTML = "";
+  wrap.appendChild(svg);
+  const tooltip = document.createElement("div");
+  tooltip.className = "chart-tooltip";
+  wrap.appendChild(tooltip);
+
+  hitArea.addEventListener("mousemove", (evt) => {
+    const pt = svg.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+    const epoch = Math.min(xMax, Math.max(1, Math.round(1 + ((svgP.x - marginLeft) / plotW) * (xMax - 1))));
+
+    crosshair.setAttribute("x1", xScale(epoch));
+    crosshair.setAttribute("x2", xScale(epoch));
+    crosshair.setAttribute("opacity", 1);
+
+    tooltip.textContent = "";
+    const epochLine = document.createElement("div");
+    epochLine.className = "tt-epoch";
+    epochLine.textContent = `Época ${epoch}`;
+    tooltip.appendChild(epochLine);
+    for (const s of seriesData) {
+      const idx = s.run.epoch.indexOf(epoch);
+      if (idx === -1) continue;
+      const row = document.createElement("div");
+      row.className = "tt-row";
+      const key = document.createElement("span");
+      key.className = "tt-key";
+      key.style.background = s.color;
+      const label = document.createElement("span");
+      label.textContent = RUN_LABELS[s.key] || s.key;
+      const value = document.createElement("span");
+      value.className = "tt-value";
+      value.textContent = yFormat(s.run[field][idx]);
+      row.appendChild(key);
+      row.appendChild(label);
+      row.appendChild(value);
+      tooltip.appendChild(row);
+    }
+    tooltip.classList.add("visible");
+    const wrapRect = wrap.getBoundingClientRect();
+    tooltip.style.left = ((xScale(epoch) / W) * wrapRect.width) + "px";
+    tooltip.style.top = ((yScale(yMax) / H) * wrapRect.height) + "px";
+  });
+  hitArea.addEventListener("mouseleave", () => {
+    tooltip.classList.remove("visible");
+    crosshair.setAttribute("opacity", 0);
+  });
+
+  // Legenda (sempre presente com 2+ séries — linha-chave + rótulo).
+  const legendEl = document.getElementById(legendId);
+  legendEl.innerHTML = "";
+  for (const key of runKeys) {
+    if (!runs[key] || !runs[key].epoch.length) continue;
+    const item = document.createElement("div");
+    item.className = "chart-legend-item";
+    const keyEl = document.createElement("span");
+    keyEl.className = "chart-legend-key";
+    keyEl.style.background = RUN_COLORS_RESOLVED[key];
+    const label = document.createElement("span");
+    label.textContent = RUN_LABELS[key] || key;
+    item.appendChild(keyEl);
+    item.appendChild(label);
+    legendEl.appendChild(item);
+  }
+}
+
+if (window.METRICS_DATA) {
+  renderStatTiles();
+  renderLineChart({
+    wrapId: "lossChartWrap", legendId: "lossChartLegend",
+    runKeys: ["sem_augmentacao", "com_augmentacao"], field: "test_loss",
+    yDomain: [0, 1.2], yTicks: [0, 0.3, 0.6, 0.9, 1.2],
+    yFormat: (v) => v.toFixed(2),
+  });
+  renderLineChart({
+    wrapId: "iouChartWrap", legendId: "iouChartLegend",
+    runKeys: ["sem_augmentacao", "com_augmentacao"], field: "mean_iou",
+    yDomain: [0, 1], yTicks: [0, 0.25, 0.5, 0.75, 1],
+    yFormat: (v) => v.toFixed(2),
+  });
+} else {
+  document.getElementById("statTiles").textContent =
+    "metrics_data.js não encontrado — rode src/tensorflow/build_metrics_js.py.";
+}
+</script>
+</body>
+</html>
