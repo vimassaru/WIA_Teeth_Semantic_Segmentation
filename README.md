@@ -1,6 +1,8 @@
 # WIA
 Workshop de Inteligência Artificial - UNIFESP
 
+🔗 **Demo ao vivo**: [vimassaru.github.io/WIA_Teeth_Semantic_Segmentation](https://vimassaru.github.io/WIA_Teeth_Semantic_Segmentation/) — sobe uma panorâmica e vê a segmentação rodando 100% no navegador, sem servidor.
+
 # Informações do Projeto
 
 Este projeto foi desenvolvido na unidade curricular Inteligência Artificial da Unifesp, onde apliquei conceitos de machine learning para tarefa de segmentação semântica como as redes neurais artificiais e processamento de imagens.
@@ -18,6 +20,8 @@ Para o desenvolvimento de todo o projeto, foram utilizadas as seguintes tecnolog
   <img align="center" alt="Icon-Python" height="100" width="200" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg">
   <img align="center" alt="Icon-Jupyter" height="100" width="200" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/jupyter/jupyter-original.svg" />
   <img align="center" alt="Icon-PyTorch" height="100" width="200" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/pytorch/pytorch-original.svg"/>
+  <img align="center" alt="Icon-TensorFlow" height="100" width="200" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tensorflow/tensorflow-original.svg"/>
+  <img align="center" alt="Icon-JavaScript" height="100" width="200" src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg"/>
 </div>
 
 
@@ -68,6 +72,78 @@ A implementação envolveu realizar um fine-tuning na última camada do modelo p
 É possível ver as modificações desenvolvida dentro do jupyter notebook na pasta `src`.
 
 <a href="src/smiledataai_segformer_pretrained.ipynb">Google Colab Notebook</a>
+
+# Reimplementação em TensorFlow + Demo Web
+
+Depois do trabalho original (PyTorch + Hugging Face `transformers`), reimplementei
+o treino do SegFormer em **TensorFlow** e publiquei uma página que roda a
+inferência **inteiramente no navegador**, via **TensorFlow.js** — sem servidor,
+sem backend, sem nada instalado do lado de quem acessa.
+
+🔗 **Testar agora**: [vimassaru.github.io/WIA_Teeth_Semantic_Segmentation](https://vimassaru.github.io/WIA_Teeth_Semantic_Segmentation/)
+
+## Como funciona a versão web
+
+A pasta [`web/`](web/) é uma página estática autocontida (`index.html` +
+modelo convertido em `web/model/`), publicada automaticamente no GitHub Pages
+a cada push (workflow em [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)).
+Ao abrir a página:
+
+1. O **TensorFlow.js** (carregado via CDN) baixa o modelo já convertido
+   (`web/model/model.json` + pesos) e o mantém em memória no navegador.
+2. Você arrasta uma imagem de raio-x panorâmico — o pré-processamento
+   (redimensionamento, normalização), a inferência e o pós-processamento
+   (upsample da máscara e o argmax por pixel) rodam todos dentro do próprio
+   grafo do modelo, no seu navegador.
+3. O resultado é uma máscara colorida por dente, sobreposta à imagem
+   original, com legenda na notação dentária e slider de opacidade.
+
+Nenhuma imagem enviada sai do seu computador — não existe upload pra
+servidor algum.
+
+## Treino em TensorFlow
+
+O treino em si (não a inferência) ainda precisa de GPU e roda fora do
+navegador, em [`src/tensorflow/`](src/tensorflow/):
+
+- **Modelo**: `keras_hub.models.SegFormerImageSegmenter`, preset
+  `segformer_b0_ade20k_512` (mesma família MiT-B0 do artigo original) —
+  usado no lugar da `transformers` porque a partir da v5 essa biblioteca
+  removeu o suporte a TensorFlow por completo, mantendo só PyTorch.
+- **Dataset**: mesmas 113 imagens de raio-x panorâmico do artigo (80 treino
+  / 33 teste), com **augmentação de dados** no treino — flip horizontal
+  (com remapeamento de quadrante, já que espelhar a imagem troca o lado da
+  boca) e variação de brilho/contraste.
+- **Otimização**: Adam com *cosine decay* na taxa de aprendizado (em vez de
+  taxa fixa), refinando melhor perto da convergência.
+- **Ambiente**: WSL2 + Python isolado via `uv`, GPU (RTX 3070) com
+  TensorFlow via `tensorflow[and-cuda]`.
+- **Exportação**: o modelo treinado (`.keras`) é empacotado com
+  pré/pós-processamento embutidos e exportado como SavedModel, depois
+  convertido para TensorFlow.js (`tensorflowjs_converter`) — é esse
+  artefato final que a página web consome.
+
+Scripts (rodar dentro do venv, na raiz do projeto):
+
+```bash
+python src/tensorflow/train.py --epochs 200          # treina e salva o checkpoint
+python src/tensorflow/eval_metrics.py                # calcula pixel accuracy / IoU / Dice no teste
+python src/tensorflow/export_savedmodel.py            # empacota o modelo de inferência
+tensorflowjs_converter --input_format=tf_saved_model data/tensorflow_savedmodel web/model
+python src/tensorflow/build_metrics_js.py              # gera web/metrics_data.js pros gráficos da página
+```
+
+## Métricas (conjunto de teste)
+
+A própria página web mostra esses números e os gráficos de treino por
+época (loss e IoU), comparando o treino com e sem augmentação de dados:
+
+| Métrica | Sem augmentação | Com augmentação (atual) |
+|---|---|---|
+| IoU médio | 0.747 | **0.760** |
+| Test loss final | 0.204 (oscilando) | **0.179** (estável) |
+| Pixel accuracy | — | **95.8%** |
+| Dice / F1 médio | — | **0.862** |
 
 # Citation
 
