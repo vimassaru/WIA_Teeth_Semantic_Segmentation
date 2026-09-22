@@ -47,8 +47,27 @@
     transition: border-color 0.15s;
   }
   #dropzone.dragover { border-color: var(--accent); color: var(--text); }
+  #dropzone.busy { opacity: 0.5; pointer-events: none; cursor: wait; }
   #fileInput { display: none; }
-  #status { margin-top: 12px; color: var(--muted); font-size: 0.9rem; min-height: 1.2em; }
+  #status {
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    min-height: 1.2em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .canvas-wrap { position: relative; max-width: 100%; margin-top: 16px; display: none; }
   .canvas-wrap canvas { max-width: 100%; height: auto; display: block; border-radius: 8px; }
   #overlayCanvas { position: absolute; top: 0; left: 0; pointer-events: none; }
@@ -216,21 +235,6 @@ function buildLegend() {
 buildLegend();
 
 const statusEl = document.getElementById("status");
-let model = null;
-
-async function loadModel() {
-  statusEl.textContent = "Carregando modelo…";
-  model = await tf.loadGraphModel(MODEL_URL);
-  statusEl.textContent = "Modelo carregado. Envie uma imagem de raio-x.";
-}
-loadModel().catch((err) => {
-  statusEl.textContent =
-    "Não consegui carregar o modelo em " + MODEL_URL +
-    " — confirme que os arquivos convertidos (tensorflowjs_converter) estão em web/model/ " +
-    "e que a página está sendo servida por um servidor local (não aberta como file://).";
-  console.error(err);
-});
-
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 const canvasWrap = document.getElementById("canvasWrap");
@@ -238,8 +242,38 @@ const imageCanvas = document.getElementById("imageCanvas");
 const overlayCanvas = document.getElementById("overlayCanvas");
 const opacityControl = document.getElementById("opacityControl");
 const opacitySlider = document.getElementById("opacity");
-
+let model = null;
 let lastMaskImageData = null;
+
+// Mostra um spinner junto do texto sempre que algo estiver rodando em
+// segundo plano (carregando modelo, rodando inferência) — sem isso, o
+// tempo entre soltar a imagem e o resultado aparecer parecia travado.
+function setStatus(text, { loading = false } = {}) {
+  statusEl.textContent = "";
+  if (loading) {
+    const spinner = document.createElement("span");
+    spinner.className = "spinner";
+    statusEl.appendChild(spinner);
+  }
+  statusEl.appendChild(document.createTextNode(text));
+}
+
+async function loadModel() {
+  setStatus("Carregando modelo…", { loading: true });
+  dropzone.classList.add("busy");
+  model = await tf.loadGraphModel(MODEL_URL);
+  dropzone.classList.remove("busy");
+  setStatus("Modelo carregado. Envie uma imagem de raio-x.");
+}
+loadModel().catch((err) => {
+  dropzone.classList.remove("busy");
+  setStatus(
+    "Não consegui carregar o modelo em " + MODEL_URL +
+    " — confirme que os arquivos convertidos (tensorflowjs_converter) estão em web/model/ " +
+    "e que a página está sendo servida por um servidor local (não aberta como file://)."
+  );
+  console.error(err);
+});
 
 dropzone.addEventListener("click", () => fileInput.click());
 dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
@@ -256,27 +290,37 @@ opacitySlider.addEventListener("input", drawOverlay);
 
 async function handleFile(file) {
   if (!model) {
-    statusEl.textContent = "Modelo ainda não carregou, aguarde e tente de novo.";
+    setStatus("Modelo ainda não carregou, aguarde e tente de novo.");
     return;
   }
-  const img = await loadImageBitmap(file);
 
-  imageCanvas.width = overlayCanvas.width = img.width;
-  imageCanvas.height = overlayCanvas.height = img.height;
-  canvasWrap.style.display = "block";
-  opacityControl.style.display = "flex";
+  dropzone.classList.add("busy");
+  try {
+    setStatus("Lendo imagem…", { loading: true });
+    const img = await loadImageBitmap(file);
 
-  const ctx = imageCanvas.getContext("2d");
-  ctx.drawImage(img, 0, 0);
+    imageCanvas.width = overlayCanvas.width = img.width;
+    imageCanvas.height = overlayCanvas.height = img.height;
+    canvasWrap.style.display = "block";
+    opacityControl.style.display = "flex";
 
-  statusEl.textContent = "Rodando inferência…";
-  const t0 = performance.now();
-  const maskArray = await runInference(imageCanvas);
-  const elapsed = (performance.now() - t0).toFixed(0);
-  statusEl.textContent = `Inferência concluída em ${elapsed}ms.`;
+    const ctx = imageCanvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
 
-  lastMaskImageData = maskToImageData(maskArray, img.width, img.height);
-  drawOverlay();
+    setStatus("Rodando inferência…", { loading: true });
+    const t0 = performance.now();
+    const maskArray = await runInference(imageCanvas);
+    const elapsed = (performance.now() - t0).toFixed(0);
+
+    lastMaskImageData = maskToImageData(maskArray, img.width, img.height);
+    drawOverlay();
+    setStatus(`Inferência concluída em ${elapsed}ms.`);
+  } catch (err) {
+    setStatus("Erro ao processar a imagem — tente outro arquivo.");
+    console.error(err);
+  } finally {
+    dropzone.classList.remove("busy");
+  }
 }
 
 function loadImageBitmap(file) {
